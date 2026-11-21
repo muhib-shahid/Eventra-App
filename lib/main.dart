@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'data/sample_events.dart';
 import 'models/event.dart';
+import 'models/booking.dart';
+import 'screens/booking_screen.dart';
+import 'screens/my_bookings_screen.dart';
 
 const Color backgroundColor = Color(0xFF101014);
 const Color surfaceColor = Color(0xFF1B1B23);
@@ -61,7 +64,7 @@ class _EventraHomeState extends State<EventraHome> {
   String selectedCategory = 'All';
 
   final Set<String> favorites = {};
-
+  final List<Booking> bookings = [];
   final List<String> categories = [
     'All',
     'Music',
@@ -106,11 +109,47 @@ class _EventraHomeState extends State<EventraHome> {
           event: event,
           isFavorite: favorites.contains(event.id),
           onFavoriteTap: () => toggleFavorite(event.id),
+          onBookTap: () => openBooking(event),
         ),
       ),
     ).then((_) {
       if (mounted) setState(() {});
     });
+  }
+
+  void openBooking(Event event) {
+    Navigator.push<Booking>(
+      context,
+      MaterialPageRoute(builder: (_) => BookingScreen(event: event)),
+    ).then((booking) {
+      if (booking != null && mounted) {
+        setState(() {
+          bookings.add(booking);
+        });
+      }
+    });
+  }
+
+  void openMyBookings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MyBookingsScreen(
+          bookings: List.unmodifiable(bookings),
+          onCancel: (bookingId) {
+            setState(() {
+              final index = bookings.indexWhere(
+                (booking) => booking.id == bookingId,
+              );
+
+              if (index != -1) {
+                bookings[index] = bookings[index].copyWith(isCancelled: true);
+              }
+            });
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -154,7 +193,7 @@ class _EventraHomeState extends State<EventraHome> {
         favorites: favorites,
         onFavoriteTap: toggleFavorite,
       ),
-      const ProfileScreen(),
+      ProfileScreen(onBookingsTap: openMyBookings),
     ];
 
     return Scaffold(
@@ -520,7 +559,9 @@ class SavedScreen extends StatelessWidget {
 // PROFILE SCREEN
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback onBookingsTap;
+
+  const ProfileScreen({super.key, required this.onBookingsTap});
 
   @override
   Widget build(BuildContext context) {
@@ -554,9 +595,10 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 35),
-        const ProfileOption(
+        ProfileOption(
           icon: Icons.confirmation_number_outlined,
           title: 'My bookings',
+          onTap: onBookingsTap,
         ),
         const ProfileOption(
           icon: Icons.person_outline,
@@ -577,8 +619,14 @@ class ProfileScreen extends StatelessWidget {
 class ProfileOption extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
-  const ProfileOption({super.key, required this.icon, required this.title});
+  const ProfileOption({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -590,7 +638,7 @@ class ProfileOption extends StatelessWidget {
         Icons.chevron_right_rounded,
         color: secondaryTextColor,
       ),
-      onTap: () {},
+      onTap: onTap,
     );
   }
 }
@@ -877,12 +925,14 @@ class EventDetailsScreen extends StatelessWidget {
   final Event event;
   final bool isFavorite;
   final VoidCallback onFavoriteTap;
+  final VoidCallback onBookTap;
 
   const EventDetailsScreen({
     super.key,
     required this.event,
     required this.isFavorite,
     required this.onFavoriteTap,
+    required this.onBookTap,
   });
 
   @override
@@ -963,15 +1013,7 @@ class EventDetailsScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Booking will be implemented in the next increment.',
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: () => onBookTap(),
                       style: FilledButton.styleFrom(
                         backgroundColor: accentColor,
                         foregroundColor: Colors.black,
